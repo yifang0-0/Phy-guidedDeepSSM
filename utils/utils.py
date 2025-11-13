@@ -3,6 +3,7 @@ import numpy as np
 import os
 import json
 from models.base import Normalizer1D
+import torch.nn as nn
 
 
 
@@ -29,19 +30,19 @@ def compute_normalizer(loader_train):
         y_mean += torch.mean(y, dim=(0, 2))
         u_var += torch.mean(torch.var(u, dim=2, unbiased=False), dim=(0,))
         y_var += torch.mean(torch.var(y, dim=2, unbiased=False), dim=(0,))
+        print(i)
 
-
+    # print("u: ", u.size(), " y: ", y.size())
+    # print("u_mean: ", u_mean, " y_mean: ", y_mean)
+    # print("u_var: ", u_var, " y_var: ", y_var)
+    # print("total_batches: ", total_batches)
     u_mean = u_mean.numpy()
     y_mean = y_mean.numpy()
     u_var = u_var.numpy()
     y_var = y_var.numpy()
 
-    # print("u_mean: ", u_mean, " y_mean: ", y_mean)
-
-    """u_normalizer = (torch.tensor(np.sqrt(u_var / total_batches) * variance_scaler),
-                    torch.tensor(u_mean / total_batches))
-    y_normalizer = (torch.tensor(np.sqrt(y_var / total_batches) * variance_scaler),
-                    torch.tensor(y_mean / total_batches))"""
+    # print("u_mean: ", u_mean, " y_mean: ", y_mean,"total_batches",total_batches)
+    # exit()
 
     u_normalizer = Normalizer1D(np.sqrt(u_var / total_batches) * variance_scaler, u_mean / total_batches)
     y_normalizer = Normalizer1D(np.sqrt(y_var / total_batches) * variance_scaler, y_mean / total_batches)

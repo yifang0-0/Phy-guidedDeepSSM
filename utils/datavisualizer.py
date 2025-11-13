@@ -14,7 +14,7 @@ x: the true(KF) state
 
 # %% simplified version of the plot
 def plot_time_sequence_uncertainty_simp(data_y_true, data_y_sample_mu, data_y_sample_std, label_y, options, path_general, file_name_general,
-                                   batch_show, x_limit_show, length = 3600, start_index = 0):
+                                   batch_show, x_limit_show, length = 1024, start_index = 0):
 
     # storage path
     file_name = file_name_general + '_timeEval_'+label_y
@@ -22,8 +22,8 @@ def plot_time_sequence_uncertainty_simp(data_y_true, data_y_sample_mu, data_y_sa
     
     x = np.linspace(start_index, start_index+length - 1, length)
 
-
     mu = data_y_sample_mu[start_index:start_index+length]
+
     std = data_y_sample_std[start_index:start_index+length]
     mu_true = data_y_true[start_index:start_index+length]
     # plot true mean
@@ -36,9 +36,6 @@ def plot_time_sequence_uncertainty_simp(data_y_true, data_y_sample_mu, data_y_sa
     # # plot 3std around
     # plt.fill_between(x, mu, mu +  3 * std, alpha=0.3, facecolor='r')
     # plt.fill_between(x, mu, mu -  3 * std, alpha=0.3, facecolor='r')
-
-
-
 
 
     # Add labels and title

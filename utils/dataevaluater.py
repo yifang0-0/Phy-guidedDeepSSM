@@ -142,13 +142,21 @@ def compute_nrmse(y, yhat, doprint=False):
 
     nrmse = np.zeros([num_outputs])
     for i in range(num_outputs):
+        print("y[i, :].shape: ", y[i, :].shape)
+        # rms_y = np.sqrt(np.mean(y[i, :] ** 2))
+        # print("rms_y",rms_y)
+        # # print("np.sqrt(((yhat[i, :] - y[i, :]) ** 2).mean()), rms_y ",np.sqrt(((yhat[i, :] - y[i, :]) ** 2).mean()), rms_y)
+        # nrmse[i] = np.sqrt(((yhat[i, :] - y[i, :]) ** 2).mean())/rms_y
         nrmse[i] = np.sqrt(((yhat[i, :] - y[i, :]) ** 2).mean())/(np.std(y[i, :]))
-
+        
+        print('x{}: '.format(i + 1), nrmse)
+        # print("y rms_y[i]: ", rms_y[i])
     # print output
     if doprint:
         for i in range(num_outputs):
-            print('NRMSE y{} = {:.3f}'.format(i + 1, nrmse[i]))
-
+            print('nrmse y{} = {:.3f}'.format(i + 1, nrmse[i]))
+            
+    print("mean nrmse: ", np.mean(nrmse))
     return nrmse
 
 
