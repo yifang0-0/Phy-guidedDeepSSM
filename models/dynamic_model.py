@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from . import STORN, VAE_RNN, VRNN_Gauss, VRNN_Gauss_I, VRNN_GMM, VRNN_GMM_I, STORN_PHY, VAE_RNN_PHY, VRNN_PHY, VAE_RNN_PHYNN,AE_RNN
+# from . import AE_RNN, Transformer_AE, AE_RNN_HInput, MLP, AE_RNN_U, MLP_U, Liu, Liu_U
+from . import AE_RNN, Transformer_AE,  Liu_U, MLP_U, AE_RNN_XU, AE_RNN_U, AE_RNN_U_SGM
+
 from torchsummary import summary
 
 class DynamicModel(nn.Module):
@@ -15,38 +17,38 @@ class DynamicModel(nn.Module):
         self.kwargs = kwargs
         self.normalizer_input = normalizer_input
         self.normalizer_output = normalizer_output
+        self.model_name = model
         # self.normalizer
         self.zero_initial_state = False
-
+    
         model_options = options['model_options']
         if "system_options" in options:
             system_options = options['system_options']
-
-        
-
+            # if self.normalizer_input is not None:
+            #     system_options['x0'] = self.normalizer_output.normalize(system_options['x0'])
+            #     print(system_options['x0'])
         # initialize the model
-        if model == 'VRNN-Gauss':
-            self.m = VRNN_Gauss(model_options, options['device'])
-        elif model == 'VRNN-Gauss-I':
-            self.m = VRNN_Gauss_I(model_options, options['device'])
-        elif model == 'VRNN-GMM':
-            self.m = VRNN_GMM(model_options, options['device'])
-        elif model == 'VRNN-GMM-I':
-            self.m = VRNN_GMM_I(model_options, options['device'])
-        elif model == 'STORN':
-            self.m = STORN(model_options, options['device'])
-        elif model == 'VAE-RNN':
-            self.m = VAE_RNN(model_options, options['device'])
-        elif model == 'STORN-PHY':
-            self.m = STORN_PHY(model_options, options['device'])
-        elif model == 'VAE-RNN-PHY':
-            self.m = VAE_RNN_PHY(model_options, options['device'], system_options,options['dataset'])
-        elif model == 'VAE-RNN-PHYNN':
-            self.m = VAE_RNN_PHYNN(model_options, options['device'], system_options,options['dataset'])
-        elif model == 'VRNN-PHY':
-            self.m = VRNN_PHY(model_options, options['device'])
-        elif model == 'AE-RNN':
+        print("model is: ", model)
+        if model == 'AE-RNN':
             self.m = AE_RNN(model_options, options['device'],system_options,options['dataset'])
+        elif model == 'AE-RNN-U':
+            self.m = AE_RNN_U(model_options, options['device'],system_options,options['dataset'])
+        elif model == 'AE-RNN-U-SGM':
+            self.m = AE_RNN_U_SGM(model_options, options['device'],system_options,options['dataset'])
+        elif model == 'AE-RNN-XU':
+            self.m = AE_RNN_XU(model_options, options['device'],system_options,options['dataset'])
+        elif model == 'MLP':
+            self.m = MLP(model_options, options['device'],system_options,options['dataset'])
+        elif model == 'MLP-U':
+            self.m = MLP_U(model_options, options['device'],system_options,options['dataset'])
+        elif model == 'LIU':
+            self.m = Liu(model_options, options['device'],system_options,options['dataset'])
+        elif model == 'LIU-U':
+            self.m = Liu_U(model_options, options['device'],system_options,options['dataset'])
+        elif model == 'AE-TRANSFORMER':
+            self.m = Transformer_AE(model_options, options['device'],system_options,options['dataset'])
+        elif model == 'AE-RNN-HInput':
+            self.m = AE_RNN_HInput(model_options, options['device'],system_options,options['dataset'])
         else:
             raise Exception("Unimplemented model")
         
@@ -60,13 +62,17 @@ class DynamicModel(nn.Module):
         return self.num_inputs + self.num_outputs if self.ar else self.num_inputs
 
     def forward(self, u, y=None):
+
         if self.normalizer_input is not None:
             u = self.normalizer_input.normalize(u)
+            # print("forward: input has been normalized")
             # normalizer_dict_u = self.normalizer_input.to_dict()
             
         if y is not None and self.normalizer_output is not None:
             y = self.normalizer_output.normalize(y)
+            # print("forward: output has been normalized")
             # normalizer_dict_y = self.normalizer_input.to_dict()
+
         loss = self.m(u, y, self.normalizer_input, self.normalizer_output)
 
         return loss
@@ -75,18 +81,25 @@ class DynamicModel(nn.Module):
         if self.normalizer_input is not None:
             u = self.normalizer_input.normalize(u)
             normalizer_dict_u = self.normalizer_input.to_dict()
+            # print("generate: input has been normalized")
+            
             
         if y is not None and self.normalizer_output is not None:
             y = self.normalizer_output.normalize(y)
+            # print("generate: output has been normalized")
             normalizer_dict_y = self.normalizer_input.to_dict()
         try:
-            y_sample, y_sample_mu, y_sample_sigma, z = self.m.generate(u, self.normalizer_input, self.normalizer_output)
+            
+            if self.model_name == 'AE-TRANSFORMER':
+                y_sample, y_sample_mu, y_sample_sigma, z = self.m.generate(u, y, self.normalizer_input, self.normalizer_output)
+            else: 
+                y_sample, y_sample_mu, y_sample_sigma, z = self.m.generate(u, self.normalizer_input, self.normalizer_output)
             # %% I don't understand this part???
             if self.normalizer_output is not None:
                 y_sample = self.normalizer_output.unnormalize(y_sample)
                 y_sample_mu = self.normalizer_output.unnormalize_mean(y_sample_mu)
                 y_sample_sigma = self.normalizer_output.unnormalize_sigma(y_sample_sigma)
-                print("yes, unnormalized")
+                # print("generate: output has been unnormalized")
             return y_sample, y_sample_mu, y_sample_sigma,z
         
         except ValueError:
@@ -96,4 +109,6 @@ class DynamicModel(nn.Module):
                 y_sample = self.normalizer_output.unnormalize(y_sample)
                 y_sample_mu = self.normalizer_output.unnormalize_mean(y_sample_mu)
                 y_sample_sigma = self.normalizer_output.unnormalize_sigma(y_sample_sigma)
+                # print("generate: output has been unnormalized")
+                
             return y_sample, y_sample_mu, y_sample_sigma

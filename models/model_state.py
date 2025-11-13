@@ -20,7 +20,14 @@ class ModelState:
         self.model = DynamicModel(model, nu, ny, options, **kwargs)
 
         # Optimization parameters
-        self.optimizer = getattr(optim, options['optim'])(self.model.parameters(), lr=options['train_options'].init_lr)
+        # self.optimizer = getattr(optim, options['optim'])(self.model.parameters(), lr=options['train_options'].init_lr)
+
+
+        self.optimizer = optim.AdamW(
+            self.model.parameters(),
+            lr=options['train_options'].init_lr,
+            weight_decay=options.get('weight_decay', 1e-2)  # Default to 0.01 if not provided
+        )
 
     def load_model(self, path, name='model.pt'):
         file = path if os.path.isfile(path) else os.path.join(path, name)
