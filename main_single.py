@@ -77,10 +77,10 @@ def run_main_single(options, path_general, file_name_general):
     # get the options
     options['device'] = device
     options['dataset_options'] = dynsys_params.get_dataset_options(options['dataset'])
-    options['system_options'] = dynsys_params.get_system_options(options['dataset'],options['dataset_options'])
+    options['train_options'] = train_params.get_train_options(options['dataset'])
+    options['system_options'] = dynsys_params.get_system_options(options['dataset'],options['dataset_options'],options['train_options'])
     options['model_options'] = model_params.get_model_options(options['model'], options['dataset'],
                                                               options['dataset_options'])
-    options['train_options'] = train_params.get_train_options(options['dataset'])
     options['test_options'] = train_params.get_test_options()
 
     # print model type and dynamic system type
@@ -116,10 +116,6 @@ def run_main_single(options, path_general, file_name_general):
         os.makedirs(path)
     # set logger
     set_redirects(path, file_name_general)
-
-
-
-        
 
 
     # save the options
@@ -163,13 +159,15 @@ def run_main_single(options, path_general, file_name_general):
         if options["normalize"]:
             print("normalized")
             normalizer_input, normalizer_output = compute_normalizer(loaders['train'])
+            print(" normalizer_input.scale, normalizer_input.offset,normalizer_output.scale, normalizer_output.offset: ", normalizer_input.scale, normalizer_input.offset,normalizer_output.scale, normalizer_output.offset)
+            
         else:
             print("no normalized")
             normalizer_input = normalizer_output = None
-        
+        # python main_single.py --n_epoch=1000 --model='AE-TRANSFORMER' --h_dim=64  --dataset='cascaded_tank' --logdir='0417_notnormalize_shift'  --mpnt_wt=-1   --do_test  --z_dim=2 --u_dim=1 --y_dim=1 --init_lr=1e-3     --do_train --normalize
         # Define model
         # for real dataset use different random seed
-        modelstate = ModelState(seed=options["seed"]+i,
+        modelstate = ModelState(seed=options["seed"]+i*10,
                                 nu=loaders["train"].nu, ny=loaders["train"].ny,
                                 model=options["model"],
                                 options=options,
@@ -179,53 +177,62 @@ def run_main_single(options, path_general, file_name_general):
         modelstate.model.to(options['device'])
         if options['do_train']:
             # train the model
+
             print("\n\n yes training started!\n\n")
-            # print("options['device']",options['device'])
-            new_df = []
-            new_df = training.run_train(modelstate=modelstate,
-                                    loader_train=loaders['train'],
-                                    loader_valid=loaders['valid'],
-                                    options=options,
-                                    dataframe=new_df,
-                                    path_general=path_general,
-                                    file_name_general=file_name_general_i)
-        
-            # check if path exists and create otherwise
-            print(new_df)
-            # df_list = []
-            # for _,i_df in df.items():
-            #     print(i_df)
-            #     df_list.append(i_df)
-            # df = pd.concat(df_list)
-            with open(path_general+file_name_general_i + '_trainingrecord.json', 'w') as f:
-                json.dump(new_df, f)
+            try:
+                # print("options['device']",options['device'])
+                new_df = []
+                new_df = training.run_train(modelstate=modelstate,
+                                        loader_train=loaders['train'],
+                                        loader_valid=loaders['valid'],
+                                        options=options,
+                                        dataframe=new_df,
+                                        path_general=path_general,
+                                        file_name_general=file_name_general_i)
+            
+                # check if path exists and create otherwise
+                print(new_df)
+                # df_list = []
+                # for _,i_df in df.items():
+                #     print(i_df)
+                #     df_list.append(i_df)
+                # df = pd.concat(df_list)
+                with open(path_general+file_name_general_i + '_trainingrecord.json', 'w') as f:
+                    json.dump(new_df, f)
+            except Exception as e:
+                print(f" Training failed for round {i+1}, skipping to next round.")
+                print("Error:", e)
+                continue
             # new_df.to_csv(path_general+file_name_general_i + '_trainingrecord.csv',index=False)
 
         
         if options['do_test']:
             # # test the model
+            try:
+                # make sure df is in dataframe format
+                df = pd.DataFrame({})
+                # for i in range(10):
+                df_single = {}
+                # test the model
+                df_single = testing.run_test(options, loaders, df, path_general, file_name_general_i)
+                # make df_single a dataframe
+                df_single = pd.DataFrame(df_single)
+                df = pd.concat([df,df_single])
 
-            # make sure df is in dataframe format
-            df = pd.DataFrame({})
-            # for i in range(10):
-            df_single = {}
-            # test the model
-            df_single = testing.run_test(options, loaders, df, path_general, file_name_general_i)
-            # make df_single a dataframe
-            df_single = pd.DataFrame(df_single)
-            df = pd.concat([df,df_single])
+                if options['savelog']:
+                    df.to_csv(path + file_name_general_i,index=False)
 
-            if options['savelog']:
-                df.to_csv(path + file_name_general_i,index=False)
+                # store values
+                all_df[i] = df
 
-            # store values
-            all_df[i] = df
-
-            # save performance values
-            # print(df['vaf'],df['vaf'][0],type(df['rmse']),type(df['vaf']))
-            all_vaf[i] = df['vaf'][0]
-            all_rmse[i] = df['rmse'][0]
-            all_nrmse[i] = df['nrmse'][0]
+                # save performance values
+                # print(df['vaf'],df['vaf'][0],type(df['rmse']),type(df['vaf']))
+                all_vaf[i] = df['vaf'][0]
+                all_rmse[i] = df['rmse'][0]
+                all_nrmse[i] = df['nrmse'][0]
+            except Exception as e:
+                print(f"Testing failed for round {i+1}, skipping to next round.")
+                print("Error:", e)
             # all_likelihood[i] = df['marginal_likeli'].item() 
         
     # %% save data
@@ -303,7 +310,6 @@ if __name__ == "__main__":
         options['known_parameter'] = main_params_parser.known_parameter
         options['train_rounds'] = main_params_parser.train_rounds
         options['start_from'] = main_params_parser.start_from
-
 
         # print("Encountered errors loading the main options of the training/testing task")
         print("normalizer: ",options['normalize'])

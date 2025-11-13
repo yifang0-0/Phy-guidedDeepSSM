@@ -63,6 +63,7 @@ def run_test(options, loaders, df, path_general, file_name_general, **kwargs):
         # getting output distribution parameter only implemented for selected models
         u_test = u_test.to(options['device'])
         y_test = y_test.to(options['device'])
+        print("u_test.shape,y_test.shape",u_test.shape,y_test.shape)
         
         # print("the original size of u and y",u_test.shape,y_test.shape)
         # y_sample, y_sample_mu, y_sample_sigma, z_sample_mu, z_sample_sigma = modelstate.model.generate(u_test)
@@ -106,6 +107,7 @@ def run_test(options, loaders, df, path_general, file_name_general, **kwargs):
         
     else:
         y_test_noisy = y_test
+    
 
     # %% plot resulting predictions
     if options['dataset'] == 'narendra_li':
@@ -128,7 +130,13 @@ def run_test(options, loaders, df, path_general, file_name_general, **kwargs):
         data_y_true = [y_test_noisy]
         data_y_sample = [y_sample_mu, y_sample_sigma]
         label_y = ['true', 'sample, $\mu\pm3\sigma$']
+        
     if options['dataset'] == 'cascaded_tank':
+        transiant = 0
+        y_test = y_test[:,:, transiant:]
+        y_test_noisy = y_test_noisy[:,:, transiant:]
+        y_sample_mu = y_sample_mu[:,:, transiant:]
+        y_sample_sigma = y_sample_sigma[:,:, transiant:]
         temp = 1024
     elif options['dataset'] == 'wiener_hammerstein':
         temp = 4000
@@ -197,6 +205,7 @@ def run_test(options, loaders, df, path_general, file_name_general, **kwargs):
         # ,'y_true':y_test.reshape(5000,),'y_true_with_noise': y_test_noisy.reshape(5000,), 'y_predict_mu': y_sample_mu.reshape(5000,),'y_predict_sigma':y_sample_sigma.reshape(5000,)
         
         value_list = [u_test, y_test, y_test_noisy, y_sample_mu, y_sample_sigma]
+        print("y_test.shape",y_test.shape)
         value_name_list = ['u_test',"y_test", "y_test_noisy", "y_sample_mu", "y_sample_sigma"]
         
         if options["dataset"] in ["toy_lgssm","toy_lgssm_5_pre","toy_lgssm_2dy_5_pre","industrobo"]:
@@ -205,34 +214,44 @@ def run_test(options, loaders, df, path_general, file_name_general, **kwargs):
             
         
         for v, v_name in zip(value_list,value_name_list):
-            if options['dataset'] == 'f16gvt':
-                v=v.transpose(0,2,1)
-                if 'y' in v_name:
-                    v=v.reshape(-1,3)
-                else:
-                    v=v.reshape(-1,2)
-            elif options['dataset'] == 'industrobo':
-                if 'y' in v_name:
-                    dim=options['dataset_options'].y_dim
-                elif 'u' in v_name:
-                    dim=options['dataset_options'].u_dim
-                elif 'z' in v_name:
-                    dim=options['model_options'].z_dim
-                else:
-                    v=v.reshape(-1,2)
-                # print("v_name v.shape",v_name, v.shape)
-                v=v.transpose(0,2,1)
-                v=v.reshape(-1,dim)
+            print("v_name v.shape",v_name, v.shape) 
+            if 'y' in v_name:
+                dim=options['dataset_options'].y_dim
+                print("y_dim:", dim)
+            elif 'u' in v_name:
+                dim=options['dataset_options'].u_dim
+            elif 'z' in v_name:
+                dim=options['model_options'].z_dim
             else:
-                v=np.transpose(np.squeeze(v))
+                v=v.reshape(-1,2)
+            
+            v=v.transpose(0,2,1)
+            v=v.reshape(-1,dim)
+            # v=np.transpose(np.squeeze(v))
+            v=np.squeeze(v)
+            
+            print("v_name v.shape",v_name, v.shape)
+            if isinstance(v, torch.Tensor):
+                dims = v.dim()
+            else:  # numpy array
+                dims = v.ndim
+            if dims == 3:  # 3D case: (length, sequence_number, dim)
+                v= v.reshape(v.shape[0] * v.shape[1], -1)
+                
+            # if 'y' in v_name:
+            #     v= v.reshape(v.shape[0] * v.shape[1])
+                
+
+            # print("v_reshaped.shape",v.shape)
             if len(v.shape) == 1:
                 column_name = [v_name+'_0']
             else:
                 column_name = [v_name+'_'+str(i) for i in range(v.shape[-1])]
-
+                # print("column_name",column_name)
             v_df = pd.DataFrame(v, columns=column_name)
             for column_name in v_df.columns:
                 data_output[column_name] = v_df[column_name]
+            print("v_name v.shape",v_name, v.shape)
                 
         df_output = pd.DataFrame(data_output)
         df_output.to_csv(output_save_path)
