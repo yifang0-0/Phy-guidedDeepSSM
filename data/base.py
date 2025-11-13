@@ -31,6 +31,7 @@ class IODataset(Dataset):
         if stride is None:
             self.u = IODataset._batchify(u.astype(np.float32), seq_len)
             self.y = IODataset._batchify(y.astype(np.float32), seq_len)
+
         else:
             print("sliding window")
             self.u = IODataset._batchify_window(u.astype(np.float32), seq_len, stride)
@@ -67,7 +68,7 @@ class IODataset(Dataset):
 
         return x
 
-    def _batchify_window(x,seq_len, stride):
+    def _batchify_window(x, seq_len, stride):
         if x.shape[0]<seq_len:
             nbatch = x.shape[0] // seq_len
             x = x[:nbatch * seq_len]
@@ -75,6 +76,10 @@ class IODataset(Dataset):
             return x
         else:
             nbatch = (x.shape[0]-seq_len)//stride + 1
-            x_windows = np.array([x[i*stride:i*stride+seq_len] for i in range(nbatch)])
-            x_windows = x_windows.transpose(0, 2, 1)
+            x_windows = np.array([x[i*stride:i*stride+seq_len] for i in range(nbatch)]) # (nbatch, seq_len, -1)
+            # x_windows = x_windows.transpose(0, 1)
+            x_windows = np.expand_dims(x_windows, axis=-1)  # add a new dimension at the end
+            x_windows = x_windows.transpose(0,2,1)  # swap first and second dimensions
+            # print()
+            print("x_window.shape, n_batch", x_windows.shape, nbatch)
             return x_windows
